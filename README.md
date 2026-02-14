@@ -1,6 +1,11 @@
-# Shared Cursor Localhost Demo
+# Shared Cursor Demo
 
 A minimal realtime site where multiple people can see each other's mouse movement.
+
+## Live Deployment
+
+Hosted on Render:
+- `https://multiplayer-mouses.onrender.com`
 
 ## Run
 
@@ -19,6 +24,7 @@ Open:
 ## Notes
 
 - If your firewall blocks inbound traffic on `4000`, allow it.
+- Render free instances can be slow on first request after idle time (cold start).
 - To change the port:
 
 ```bash
