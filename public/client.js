@@ -5,6 +5,7 @@ const users = new Map();
 let selfId = null;
 let latestMove = null;
 let sendTimer = null;
+let locationSent = false;
 
 function setStatus(text) {
   statusEl.textContent = text;
@@ -124,6 +125,69 @@ function applyUserIdentity(entry, user) {
   renderBadge(entry.badgeEl, user.location);
 }
 
+function buildLocationFromGeoResponse(raw) {
+  if (!raw || typeof raw !== "object") {
+    return { kind: "unknown" };
+  }
+
+  const countryCode = String(raw.country_code || raw.country || "").toUpperCase();
+  const countryName = String(raw.country_name || raw.country || countryCode || "Unknown");
+  const stateCode = String(raw.region_code || "").toUpperCase();
+  const stateName = String(raw.region || stateCode || "");
+
+  if (countryCode === "US" && /^[A-Z]{2}$/.test(stateCode)) {
+    return {
+      kind: "us_state",
+      stateCode,
+      stateName
+    };
+  }
+
+  if (/^[A-Z]{2}$/.test(countryCode)) {
+    return {
+      kind: "country",
+      countryCode,
+      countryName
+    };
+  }
+
+  return { kind: "unknown" };
+}
+
+async function fetchGeoFrom(url) {
+  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!response.ok) {
+    return null;
+  }
+  const data = await response.json();
+  if (!data || data.error === true || data.success === false) {
+    return null;
+  }
+  return data;
+}
+
+async function sendSelfLocation() {
+  if (!selfId || locationSent) {
+    return;
+  }
+
+  try {
+    const primary = await fetchGeoFrom("https://ipapi.co/json/");
+    const data = primary || (await fetchGeoFrom("https://ipwho.is/"));
+    const location = buildLocationFromGeoResponse(data);
+
+    await fetch("/location", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: selfId, location })
+    });
+
+    locationSent = true;
+  } catch (error) {
+    // Non-fatal: server-side location can still resolve when available.
+  }
+}
+
 function handleEvent(payload) {
   if (payload.type === "self") {
     selfId = payload.user.id;
@@ -131,6 +195,7 @@ function handleEvent(payload) {
     setStatus(`Connected as ${payload.user.label} (${formatLocation(payload.user.location)})`);
     latestMove = { x: stage.clientWidth / 2, y: stage.clientHeight / 2 };
     queueSendMove();
+    void sendSelfLocation();
     return;
   }
 

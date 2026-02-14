@@ -202,6 +202,50 @@ function parseLocationData(data) {
   return unknownLocation(true);
 }
 
+function normalizeLocationPayload(payload) {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const kind = String(payload.kind || "");
+  if (kind === "us_state") {
+    const stateCode = String(payload.stateCode || "").toUpperCase();
+    if (!US_REGION_CODES.has(stateCode)) {
+      return null;
+    }
+    return {
+      kind: "us_state",
+      countryCode: "US",
+      stateCode,
+      stateName: String(payload.stateName || stateCode),
+      label: `${stateCode}, US`,
+      flagUrl: `https://cdn.jsdelivr.net/npm/us-state-flags@1.0.7/assets/flags/svg/${stateCode}.svg`,
+      resolved: true
+    };
+  }
+
+  if (kind === "country") {
+    const countryCode = String(payload.countryCode || "").toUpperCase();
+    if (!/^[A-Z]{2}$/.test(countryCode)) {
+      return null;
+    }
+    return {
+      kind: "country",
+      countryCode,
+      countryName: String(payload.countryName || countryCode),
+      label: String(payload.countryName || countryCode),
+      countryEmoji: countryCodeToEmoji(countryCode),
+      resolved: true
+    };
+  }
+
+  if (kind === "unknown") {
+    return unknownLocation(true);
+  }
+
+  return null;
+}
+
 async function fetchLocationData(url) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), GEO_TIMEOUT_MS);
@@ -347,6 +391,36 @@ const server = http.createServer(async (req, res) => {
       user.x = x;
       user.y = y;
       broadcast({ type: "move", id, x, y });
+      res.writeHead(204);
+      res.end();
+    } catch (error) {
+      res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: false, error: "Bad JSON body" }));
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/location") {
+    try {
+      const body = await parseBody(req);
+      const id = String(body.id || "");
+      const user = users.get(id);
+      if (!id || !user) {
+        res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: false, error: "Invalid user id" }));
+        return;
+      }
+
+      const normalized = normalizeLocationPayload(body.location);
+      if (!normalized) {
+        res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: false, error: "Invalid location payload" }));
+        return;
+      }
+
+      user.location = normalized;
+      broadcast({ type: "user_update", user });
+
       res.writeHead(204);
       res.end();
     } catch (error) {
