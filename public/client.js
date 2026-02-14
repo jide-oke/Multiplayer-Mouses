@@ -106,6 +106,12 @@ function renderBadge(badgeEl, location) {
     image.src = location.flagUrl;
     image.alt = `${location.stateCode || "US"} flag`;
     image.className = "cursor-flag-image";
+    image.loading = "lazy";
+    image.referrerPolicy = "no-referrer";
+    image.onerror = () => {
+      badgeEl.replaceChildren();
+      badgeEl.textContent = "🇺🇸";
+    };
     badgeEl.appendChild(image);
     return;
   }

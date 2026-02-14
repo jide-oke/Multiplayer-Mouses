@@ -25,6 +25,10 @@ const US_REGION_CODES = new Set([
   "DC", "PR", "VI", "GU", "AS", "MP"
 ]);
 
+function usStateFlagUrl(stateCode) {
+  return `https://hatscripts.github.io/circle-flags/flags/us-${stateCode.toLowerCase()}.svg`;
+}
+
 function sendSSE(res, payload) {
   res.write(`data: ${JSON.stringify(payload)}\n\n`);
 }
@@ -183,7 +187,7 @@ function parseLocationData(data) {
       stateCode: regionCode,
       stateName: regionName,
       label: `${regionCode}, US`,
-      flagUrl: `https://cdn.jsdelivr.net/npm/us-state-flags@1.0.7/assets/flags/svg/${regionCode}.svg`,
+      flagUrl: usStateFlagUrl(regionCode),
       resolved: true
     };
   }
@@ -219,7 +223,7 @@ function normalizeLocationPayload(payload) {
       stateCode,
       stateName: String(payload.stateName || stateCode),
       label: `${stateCode}, US`,
-      flagUrl: `https://cdn.jsdelivr.net/npm/us-state-flags@1.0.7/assets/flags/svg/${stateCode}.svg`,
+      flagUrl: usStateFlagUrl(stateCode),
       resolved: true
     };
   }
