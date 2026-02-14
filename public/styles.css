@@ -7,16 +7,30 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   margin: 0;
   background: #f2f6fb;
   color: #1b2937;
+  overflow: hidden;
 }
 
-main {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 1.5rem;
+.hud {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 20;
+  max-width: min(560px, calc(100vw - 2rem));
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid #c8d4e6;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  backdrop-filter: blur(3px);
+  pointer-events: none;
 }
 
 h1 {
@@ -32,11 +46,8 @@ p {
 }
 
 #stage {
-  position: relative;
-  height: min(72vh, 640px);
-  margin-top: 1rem;
-  border-radius: 12px;
-  border: 1px solid #c2cfe0;
+  position: fixed;
+  inset: 0;
   background:
     radial-gradient(circle at top right, #ffffff 0%, #eaf1ff 40%, #dde8fb 100%);
   overflow: hidden;
