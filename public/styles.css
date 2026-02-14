@@ -1,0 +1,67 @@
+:root {
+  color-scheme: light;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f2f6fb;
+  color: #1b2937;
+}
+
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+h1 {
+  margin: 0 0 0.5rem;
+}
+
+p {
+  margin: 0.25rem 0;
+}
+
+#status {
+  font-weight: 700;
+}
+
+#stage {
+  position: relative;
+  height: min(72vh, 640px);
+  margin-top: 1rem;
+  border-radius: 12px;
+  border: 1px solid #c2cfe0;
+  background:
+    radial-gradient(circle at top right, #ffffff 0%, #eaf1ff 40%, #dde8fb 100%);
+  overflow: hidden;
+  cursor: none;
+}
+
+.cursor {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.cursor-label {
+  position: absolute;
+  top: 14px;
+  left: 12px;
+  font-size: 0.75rem;
+  color: #0f1d2b;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  padding: 0.15rem 0.35rem;
+  white-space: nowrap;
+}

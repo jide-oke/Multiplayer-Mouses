@@ -1,0 +1,9 @@
+{
+  "name": "live-cursor-local",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Realtime shared cursor demo for LAN testing",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
