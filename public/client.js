@@ -13,6 +13,14 @@ function setStatus(text) {
 function ensureCursor(user) {
   let entry = users.get(user.id);
   if (entry) {
+    applyUserIdentity(entry, user);
+    if (typeof user.x === "number") {
+      entry.x = user.x;
+    }
+    if (typeof user.y === "number") {
+      entry.y = user.y;
+    }
+    renderCursor(entry);
     return entry;
   }
 
@@ -22,13 +30,34 @@ function ensureCursor(user) {
 
   const label = document.createElement("span");
   label.className = "cursor-label";
-  label.textContent = user.label;
+
+  const badge = document.createElement("span");
+  badge.className = "cursor-badge";
+
+  const name = document.createElement("span");
+  name.className = "cursor-name";
+
+  const place = document.createElement("span");
+  place.className = "cursor-place";
+
+  label.appendChild(badge);
+  label.appendChild(name);
+  label.appendChild(place);
   node.appendChild(label);
   stage.appendChild(node);
 
   const initialX = typeof user.x === "number" ? user.x : stage.clientWidth / 2;
   const initialY = typeof user.y === "number" ? user.y : stage.clientHeight / 2;
-  entry = { ...user, node, x: initialX, y: initialY };
+  entry = {
+    ...user,
+    node,
+    x: initialX,
+    y: initialY,
+    badgeEl: badge,
+    nameEl: name,
+    placeEl: place
+  };
+  applyUserIdentity(entry, user);
   users.set(user.id, entry);
   renderCursor(entry);
   return entry;
@@ -48,11 +77,55 @@ function renderCursor(entry) {
   entry.node.style.top = `${entry.y}px`;
 }
 
+function formatLocation(location) {
+  if (!location || location.kind === "unknown") {
+    return "Locating...";
+  }
+  if (location.kind === "us_state") {
+    return `${location.stateCode}, US`;
+  }
+  if (location.kind === "country") {
+    return location.countryName || location.countryCode || "Unknown";
+  }
+  return "Unknown";
+}
+
+function renderBadge(badgeEl, location) {
+  badgeEl.replaceChildren();
+  if (!location || location.kind === "unknown") {
+    badgeEl.textContent = "🌐";
+    return;
+  }
+
+  if (location.kind === "us_state" && location.flagUrl) {
+    const image = document.createElement("img");
+    image.src = location.flagUrl;
+    image.alt = `${location.stateCode || "US"} flag`;
+    image.className = "cursor-flag-image";
+    badgeEl.appendChild(image);
+    return;
+  }
+
+  if (location.kind === "country" && location.countryEmoji) {
+    badgeEl.textContent = location.countryEmoji;
+    return;
+  }
+
+  badgeEl.textContent = "🌐";
+}
+
+function applyUserIdentity(entry, user) {
+  entry.node.style.background = user.color;
+  entry.nameEl.textContent = user.label;
+  entry.placeEl.textContent = `· ${formatLocation(user.location)}`;
+  renderBadge(entry.badgeEl, user.location);
+}
+
 function handleEvent(payload) {
   if (payload.type === "self") {
     selfId = payload.user.id;
     ensureCursor(payload.user);
-    setStatus(`Connected as ${payload.user.label}`);
+    setStatus(`Connected as ${payload.user.label} (${formatLocation(payload.user.location)})`);
     latestMove = { x: stage.clientWidth / 2, y: stage.clientHeight / 2 };
     queueSendMove();
     return;
@@ -81,6 +154,14 @@ function handleEvent(payload) {
     entry.x = payload.x;
     entry.y = payload.y;
     renderCursor(entry);
+    return;
+  }
+
+  if (payload.type === "user_update") {
+    ensureCursor(payload.user);
+    if (payload.user.id === selfId) {
+      setStatus(`Connected as ${payload.user.label} (${formatLocation(payload.user.location)})`);
+    }
   }
 }
 

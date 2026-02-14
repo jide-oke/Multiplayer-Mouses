@@ -7,6 +7,12 @@ A minimal realtime site where multiple people can see each other's mouse movemen
 Hosted on Render:
 - `https://multiplayer-mouses.onrender.com`
 
+## Location Flags
+
+- US visitors show a US state flag (based on IP geolocation state code).
+- Non-US visitors show a country flag (emoji).
+- Location data is looked up server-side on connect and then cached by IP.
+
 ## Run
 
 ```bash
@@ -25,10 +31,17 @@ Open:
 
 - If your firewall blocks inbound traffic on `4000`, allow it.
 - Render free instances can be slow on first request after idle time (cold start).
+- On localhost/private LAN, IP geolocation may not resolve and the app will show a generic globe icon.
 - To change the port:
 
 ```bash
 PORT=4010 npm start
+```
+
+- To disable geolocation:
+
+```bash
+DISABLE_GEO=1 npm start
 ```
 
 ## Files
