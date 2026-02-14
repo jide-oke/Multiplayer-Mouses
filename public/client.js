@@ -79,6 +79,9 @@ function renderCursor(entry) {
 
 function formatLocation(location) {
   if (!location || location.kind === "unknown") {
+    if (location && location.resolved) {
+      return "Unknown";
+    }
     return "Locating...";
   }
   if (location.kind === "us_state") {

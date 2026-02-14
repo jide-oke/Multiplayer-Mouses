@@ -7,6 +7,7 @@ const PORT = Number(process.env.PORT) || 4000;
 const HOST = process.env.HOST || "0.0.0.0";
 const GEO_ENABLED = process.env.DISABLE_GEO !== "1";
 const GEO_API_BASE = process.env.GEO_API_BASE || "https://ipapi.co";
+const GEO_FALLBACK_API_BASE = process.env.GEO_FALLBACK_API_BASE || "https://ipwho.is";
 const GEO_TIMEOUT_MS = Number(process.env.GEO_TIMEOUT_MS) || 1500;
 const GEO_CACHE_TTL_MS = Number(process.env.GEO_CACHE_TTL_MS) || 6 * 60 * 60 * 1000;
 
@@ -14,6 +15,7 @@ const publicDir = path.join(__dirname, "public");
 const clients = new Set();
 const users = new Map();
 const locationCache = new Map();
+const locationInFlight = new Map();
 const US_REGION_CODES = new Set([
   "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
   "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
@@ -93,10 +95,11 @@ function makeColor(seed) {
   return `hsl(${hue} 85% 55%)`;
 }
 
-function unknownLocation() {
+function unknownLocation(resolved = false) {
   return {
     kind: "unknown",
-    label: "Unknown"
+    label: "Unknown",
+    resolved
   };
 }
 
@@ -166,7 +169,7 @@ function countryCodeToEmoji(countryCode) {
 
 function parseLocationData(data) {
   if (!data || typeof data !== "object") {
-    return unknownLocation();
+    return unknownLocation(true);
   }
   const countryCode = String(data.country_code || data.country || "").toUpperCase();
   const countryName = String(data.country_name || countryCode || "Unknown");
@@ -180,7 +183,8 @@ function parseLocationData(data) {
       stateCode: regionCode,
       stateName: regionName,
       label: `${regionCode}, US`,
-      flagUrl: `https://cdn.jsdelivr.net/npm/us-state-flags@1.0.7/assets/flags/svg/${regionCode}.svg`
+      flagUrl: `https://cdn.jsdelivr.net/npm/us-state-flags@1.0.7/assets/flags/svg/${regionCode}.svg`,
+      resolved: true
     };
   }
 
@@ -190,19 +194,19 @@ function parseLocationData(data) {
       countryCode,
       countryName,
       label: countryName,
-      countryEmoji: countryCodeToEmoji(countryCode)
+      countryEmoji: countryCodeToEmoji(countryCode),
+      resolved: true
     };
   }
 
-  return unknownLocation();
+  return unknownLocation(true);
 }
 
-async function fetchLocationData(ip) {
+async function fetchLocationData(url) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), GEO_TIMEOUT_MS);
   try {
-    const ipPath = encodeURIComponent(ip);
-    const response = await fetch(`${GEO_API_BASE.replace(/\/$/, "")}/${ipPath}/json/`, {
+    const response = await fetch(url, {
       method: "GET",
       headers: { Accept: "application/json" },
       signal: controller.signal
@@ -212,6 +216,9 @@ async function fetchLocationData(ip) {
     }
     const data = await response.json();
     if (data && data.error) {
+      return null;
+    }
+    if (data && data.success === false) {
       return null;
     }
     return data;
@@ -224,7 +231,7 @@ async function fetchLocationData(ip) {
 
 async function getLocationForIp(ip) {
   if (!GEO_ENABLED || isPrivateOrLocalIp(ip)) {
-    return unknownLocation();
+    return unknownLocation(true);
   }
 
   const cached = locationCache.get(ip);
@@ -232,10 +239,34 @@ async function getLocationForIp(ip) {
     return cached.value;
   }
 
-  const remoteData = await fetchLocationData(ip);
-  const location = parseLocationData(remoteData);
-  locationCache.set(ip, { value: location, expiresAt: Date.now() + GEO_CACHE_TTL_MS });
-  return location;
+  if (locationInFlight.has(ip)) {
+    return locationInFlight.get(ip);
+  }
+
+  const lookupPromise = (async () => {
+    const ipPath = encodeURIComponent(ip);
+    const primaryData = await fetchLocationData(
+      `${GEO_API_BASE.replace(/\/$/, "")}/${ipPath}/json/`
+    );
+
+    let location = parseLocationData(primaryData);
+    if (location.kind === "unknown") {
+      const fallbackData = await fetchLocationData(
+        `${GEO_FALLBACK_API_BASE.replace(/\/$/, "")}/${ipPath}`
+      );
+      location = parseLocationData(fallbackData);
+    }
+
+    locationCache.set(ip, { value: location, expiresAt: Date.now() + GEO_CACHE_TTL_MS });
+    return location;
+  })();
+
+  locationInFlight.set(ip, lookupPromise);
+  try {
+    return await lookupPromise;
+  } finally {
+    locationInFlight.delete(ip);
+  }
 }
 
 async function hydrateUserLocation(userId, ip) {
@@ -277,7 +308,7 @@ const server = http.createServer(async (req, res) => {
       id,
       label: `User ${users.size + 1}`,
       color: makeColor(`${id}-${ip}`),
-      location: unknownLocation()
+      location: unknownLocation(false)
     };
 
     users.set(id, user);
